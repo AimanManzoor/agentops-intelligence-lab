@@ -30,3 +30,31 @@ models/
 # Local files
 .DS_Store
 .vscode/
+# Python environments
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated model binaries
+models/
+*.joblib
+
+# Generated evaluation data
+evals/results/
+
+# Mac system files
+.DS_Store
