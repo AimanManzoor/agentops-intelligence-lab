@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# SQLite local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Generated datasets and model artifacts
+data/raw/
+data/synthetic/
+data/processed/
+evals/results/
+models/
+*.pkl
+*.joblib
+
+# Local files
+.DS_Store
+.vscode/
