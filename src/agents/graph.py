@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from langgraph.graph import StateGraph, START, END
 from src.tools.prediction_tool import predict_failure
+from src.tools.sql_investigation_tool import get_pipeline_evidence
 
 
 # Shared information passed between graph nodes
@@ -16,6 +17,8 @@ class AgentState(TypedDict, total=False):
     pipeline_name: str
     input_features: dict
     prediction: dict
+    evidence: dict
+    as_of_utc: str
     route_taken: str
     final_message: str
 
@@ -47,16 +50,33 @@ def route_by_risk(state: AgentState) -> str:
     return "normal_processing"
 
 
+# Gather evidence only for elevated-risk cases.
+def investigate(state: AgentState) -> dict:
+    evidence = get_pipeline_evidence(
+        state["pipeline_name"],
+        as_of=state.get("as_of_utc"),
+    )
+    return {"evidence": evidence}
+
+
 # Node 3A: Handle elevated risk
 def risk_review(state: AgentState) -> dict:
     probability = state["prediction"]["failure_probability"]
+    evidence = state["evidence"]
+    history = "No prior matching runs were found before the evidence cutoff."
+    if evidence["total_runs"]:
+        history = (
+            f"Prior synthetic runs: {evidence['failed_runs']} failures "
+            f"out of {evidence['total_runs']} "
+            f"({evidence['historical_failure_rate']:.2%})."
+        )
 
     return {
         "route_taken": "risk_review",
         "final_message": (
             f"{state['pipeline_name']} has elevated predicted "
             f"failure risk ({probability:.2%}). "
-            "Recommend further investigation."
+            f"{history} Recommend further investigation."
         ),
     }
 
@@ -81,6 +101,7 @@ def build_graph():
 
     workflow.add_node("validate_input", validate_input)
     workflow.add_node("prediction", prediction_node)
+    workflow.add_node("investigate", investigate)
     workflow.add_node("risk_review", risk_review)
     workflow.add_node("normal_processing", normal_processing)
 
@@ -91,11 +112,12 @@ def build_graph():
         "prediction",
         route_by_risk,
         {
-            "risk_review": "risk_review",
+            "risk_review": "investigate",
             "normal_processing": "normal_processing",
         },
     )
 
+    workflow.add_edge("investigate", "risk_review")
     workflow.add_edge("risk_review", END)
     workflow.add_edge("normal_processing", END)
 
