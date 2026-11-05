@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, and deterministic LangGraph risk-routing workflow implemented. **Planned:** SQL investigation tools, historical incident retrieval/RAG, LLM-assisted investigation, agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, and deterministic LangGraph risk routing implemented. Regression tests cover SQL evidence retrieval and both graph branches. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -28,9 +28,11 @@ Production data platforms run ingestion, ETL, synchronization, and reporting job
 | Evaluation | Chronological 70/15/15 split; select model on validation average precision; tune threshold on validation F1; final test metrics and figures | Implemented |
 | Inference | `predict_failure()` validates inputs, loads the local trusted model artifact, returns structured risk output | Implemented |
 | Workflow | LangGraph shared state, validation and prediction nodes, conditional high/low-risk routes | Implemented (deterministic) |
+| SQL investigation | Read-only, parameterized SQLite queries; time cutoff; failure counts and recorded labels | Implemented |
+| Regression tests | SQL filtering, time cutoff, empty results, high-risk evidence retrieval, and low-risk SQL bypass | Implemented |
 | Agent reasoning, RAG, external telemetry, deployment | Not yet implemented | Roadmap |
 
-**Terminology:** The current LangGraph system is a deterministic tool-using workflow, **not** an autonomous LLM agent. The SQL investigative agent, retrieval, LLM-driven decisions, and guarded remediation are future milestones.
+**Terminology:** The current LangGraph system is a deterministic tool-using workflow, **not** an autonomous LLM agent. The elevated-risk branch now retrieves SQL evidence before risk review. Semantic retrieval/RAG, LLM-driven decisions, and guarded remediation are future milestones.
 
 ## 3. Architecture
 
@@ -43,14 +45,16 @@ flowchart TD
     V --> P[LangGraph: prediction_node]
     P --> T[predict_failure tool]
     M --> T
-    T --> R{Risk above threshold?}
-    R -->|Yes| H[Risk review response]
+    T --> R{Risk at or above threshold?}
+    R -->|Yes| I[Read-only SQL investigation]
+    DB --> I
+    I --> H[Risk review with evidence]
     R -->|No| L[Standard checks response]
     H --> OUT[Structured output]
     L --> OUT
 ```
 
-In the workflow, **state** carries the input, prediction and route; **nodes** do bounded work; **edges** define execution order; the **conditional edge** selects a route. The ML model performs inference—it does not orchestrate the graph.
+In the workflow, **state** carries the input, prediction, SQL evidence and route; **nodes** do bounded work; **edges** define execution order; the **conditional edge** selects a route. The ML model performs inference—it does not orchestrate the graph.
 
 For the current graph definition, see [the LangGraph workflow diagram](docs/langgraph_workflow.md). For planned architecture and evaluation decisions, see [architecture](docs/architecture.md), [evaluation methodology](docs/evaluation_methodology.md), and the [model card](docs/model_card.md).
 
@@ -120,9 +124,12 @@ agentops-intelligence-lab/
 │   ├── prediction/
 │   │   └── Train_model.py              # Initial ML baseline experiment
 │   ├── tools/
-│   │   └── prediction_tool.py          # Validated inference interface
+│   │   ├── prediction_tool.py          # Validated inference interface
+│   │   └── sql_investigation_tool.py   # Read-only incident evidence
 │   └── agents/
 │       └── graph.py                    # Current deterministic LangGraph workflow
+├── tests/
+│   └── test_investigation.py           # SQL and workflow regression checks
 ├── requirements.txt
 └── README.md
 ```
@@ -155,6 +162,30 @@ agentops-intelligence-lab/
 
 **Do not load untrusted `.joblib` files:** Python pickle/joblib deserialization can execute code. Only use artifacts produced by code and environments you trust.
 
+### SQL evidence and regression checks
+
+Run the standalone evidence tool:
+
+```bash
+python src/tools/sql_investigation_tool.py
+```
+
+Run the regression tests:
+
+```bash
+python -m unittest discover -s tests -p 'test_investigation.py' -v
+```
+
+The elevated-risk path is **prediction → investigate → risk_review**; the lower-risk path skips SQL. The investigation tool opens SQLite in read-only mode and uses parameterized queries. It returns the source table, synthetic-data marker, UTC cutoff, total runs, failed runs, historical failure rate, and recorded failure labels.
+
+An optional graph input, `as_of_utc`, sets the evidence cutoff; otherwise the tool uses the current UTC time. Only records whose `started_at` is strictly before that cutoff are included. Naive timestamps are interpreted as UTC. The synthetic schema does not include completion timestamps, so this filter is based on run start time.
+
+A pipeline with no matching history returns zero counts, a null historical failure rate, and an empty label list. Missing databases and SQL errors currently propagate as errors; recovery behavior is a future improvement.
+
+The historical failure rate is an observed fraction across the selected pipeline's recorded runs, not a replacement for the model's case-specific risk estimate. Recorded synthetic labels supply context and do not establish the cause of a new case.
+
+The four regression tests use a temporary SQLite database and controlled prediction outputs. They check workflow and SQL behavior rather than predictive accuracy, and do not require a trained model artifact. The separate local smoke checks exercised the trained model's elevated-risk and lower-risk examples.
+
 ## 8. Learning goals and engineering decisions
 
 | Concept | Where it appears | Why it matters |
@@ -168,7 +199,7 @@ agentops-intelligence-lab/
 | Conditional routing | `route_by_risk()` | Clear risk-dependent workflow |
 | Version control | Git commits and public repository | Traceable milestones |
 
-**What this project demonstrates today:** the ability to connect data generation, validation, ML evaluation, model inference and graph-based routing. **What comes next:** grounding outputs in SQL and historical evidence, then designing and evaluating more agentic behavior.
+**What this project demonstrates today:** the ability to connect data generation, validation, ML evaluation, model inference, conditional graph routing, and SQL evidence retrieval. **What comes next:** semantic incident retrieval/RAG and evaluated LLM-assisted investigation.
 
 ## 9. Roadmap
 
@@ -177,8 +208,9 @@ agentops-intelligence-lab/
 - [x] Train/validation/test evaluation and threshold tuning
 - [x] Validated inference tool
 - [x] Deterministic LangGraph graph and conditional routing
-- [ ] Automated tests for the inference tool and both graph branches
-- [ ] Read-only SQL investigation tool and incident evidence retrieval
+- [x] Regression tests for SQL evidence retrieval and both graph branches
+- [ ] Automated tests for inference input validation and model-artifact handling
+- [x] Read-only SQL investigation tool and incident evidence retrieval
 - [ ] Historical search / RAG and context selection with source attribution
 - [ ] LLM-based investigation and tool-choice policies with safeguards
 - [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests
@@ -190,7 +222,7 @@ agentops-intelligence-lab/
 1. The incident dataset is synthetic; results are not generalizable without real-world evaluation.
 2. The `recent_failure_rate` is simulated, not derived from real historical windows.
 3. Root-cause labels are rule-assigned and are not independently verified causal explanations.
-4. There is no live source ingestion, incident retrieval, LLM reasoning, human approval workflow, or deployed service yet.
+4. There is no live source ingestion, semantic incident retrieval/RAG, LLM reasoning, human approval workflow, or deployed service yet.
 5. The local SQLite database and model binaries are intentionally excluded from the repository.
 
 ---
