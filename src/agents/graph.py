@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 from langgraph.graph import StateGraph, START, END
 from src.tools.prediction_tool import predict_failure
 from src.tools.sql_investigation_tool import get_pipeline_evidence
+from src.tools.incident_retrieval_tool import retrieve_similar_incidents
 
 
 # Shared information passed between graph nodes
@@ -18,6 +19,7 @@ class AgentState(TypedDict, total=False):
     input_features: dict
     prediction: dict
     evidence: dict
+    retrieval: dict
     as_of_utc: str
     route_taken: str
     final_message: str
@@ -56,13 +58,27 @@ def investigate(state: AgentState) -> dict:
         state["pipeline_name"],
         as_of=state.get("as_of_utc"),
     )
-    return {"evidence": evidence}
+    return {"evidence": evidence, "as_of_utc": evidence["as_of_utc"]}
+
+
+def retrieve_incidents(state: AgentState) -> dict:
+    retrieval = retrieve_similar_incidents(
+        state["pipeline_name"], state["input_features"],
+        as_of=state["as_of_utc"], k=3,
+    )
+    return {"retrieval": retrieval}
 
 
 # Node 3A: Handle elevated risk
 def risk_review(state: AgentState) -> dict:
     probability = state["prediction"]["failure_probability"]
     evidence = state["evidence"]
+    matches = state["retrieval"]["matches"]
+    references = ", ".join(item["source_id"] for item in matches)
+    retrieval_note = (
+        f"Nearest prior failure references: {references}. "
+        if matches else "No prior failures matched the retrieval filters. "
+    )
     history = "No prior matching runs were found before the evidence cutoff."
     if evidence["total_runs"]:
         history = (
@@ -76,7 +92,7 @@ def risk_review(state: AgentState) -> dict:
         "final_message": (
             f"{state['pipeline_name']} has elevated predicted "
             f"failure risk ({probability:.2%}). "
-            f"{history} Recommend further investigation."
+            f"{history} {retrieval_note}Recommend further investigation."
         ),
     }
 
@@ -102,6 +118,7 @@ def build_graph():
     workflow.add_node("validate_input", validate_input)
     workflow.add_node("prediction", prediction_node)
     workflow.add_node("investigate", investigate)
+    workflow.add_node("retrieve_incidents", retrieve_incidents)
     workflow.add_node("risk_review", risk_review)
     workflow.add_node("normal_processing", normal_processing)
 
@@ -117,7 +134,8 @@ def build_graph():
         },
     )
 
-    workflow.add_edge("investigate", "risk_review")
+    workflow.add_edge("investigate", "retrieve_incidents")
+    workflow.add_edge("retrieve_incidents", "risk_review")
     workflow.add_edge("risk_review", END)
     workflow.add_edge("normal_processing", END)
 

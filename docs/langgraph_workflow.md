@@ -11,13 +11,15 @@ graph TD;
 	validate_input(validate_input)
 	prediction(prediction)
 	investigate(investigate)
+	retrieve_incidents(retrieve_incidents)
 	risk_review(risk_review)
 	normal_processing(normal_processing)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> validate_input;
-	investigate --> risk_review;
+	investigate --> retrieve_incidents;
 	prediction -. &nbsp;risk_review&nbsp; .-> investigate;
 	prediction -.-> normal_processing;
+	retrieve_incidents --> risk_review;
 	validate_input --> prediction;
 	normal_processing --> __end__;
 	risk_review --> __end__;

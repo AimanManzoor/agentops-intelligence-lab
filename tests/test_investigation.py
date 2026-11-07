@@ -27,6 +27,10 @@ class InvestigationTests(unittest.TestCase):
                 ("inventory_sync", "2026-01-01T00:00:00", 1, "High workload"),
             ])
         conn.close()
+        stub = patch("src.agents.graph.retrieve_similar_incidents",
+                     return_value={"matches": []})
+        self.retrieval_mock = stub.start()
+        self.addCleanup(stub.stop)
         self.request = {
             "pipeline_name": "payment_etl",
             "input_features": {},
@@ -64,6 +68,8 @@ class InvestigationTests(unittest.TestCase):
         self.assertEqual(result["route_taken"], "risk_review")
         self.assertEqual(result["evidence"]["failed_runs"], 1)
         self.assertIn("50.00%", result["final_message"])
+        self.retrieval_mock.assert_called_once_with(
+            "payment_etl", self.request["input_features"], as_of=CUTOFF, k=3)
 
     def test_low_risk_skips_sql(self):
         prediction = {"failure_probability": 0.01, "predicted_failure": False}
@@ -73,6 +79,8 @@ class InvestigationTests(unittest.TestCase):
         sql.assert_not_called()
         self.assertEqual(result["route_taken"], "normal_processing")
         self.assertNotIn("evidence", result)
+        self.assertNotIn("retrieval", result)
+        self.retrieval_mock.assert_not_called()
 
 
 if __name__ == "__main__":

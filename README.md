@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, and deterministic LangGraph risk routing implemented. Regression tests cover SQL evidence retrieval and both graph branches. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. Regression tests cover SQL evidence retrieval and both graph branches. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -29,6 +29,7 @@ Production data platforms run ingestion, ETL, synchronization, and reporting job
 | Inference | `predict_failure()` validates inputs, loads the local trusted model artifact, returns structured risk output | Implemented |
 | Workflow | LangGraph shared state, validation and prediction nodes, conditional high/low-risk routes | Implemented (deterministic) |
 | SQL investigation | Read-only, parameterized SQLite queries; time cutoff; failure counts and recorded labels | Implemented |
+| Similar incident retrieval | Fixed-scale feature distance; prior failures; traceable run IDs | Implemented |
 | Regression tests | SQL filtering, time cutoff, empty results, high-risk evidence retrieval, and low-risk SQL bypass | Implemented |
 | Agent reasoning, RAG, external telemetry, deployment | Not yet implemented | Roadmap |
 
@@ -48,13 +49,15 @@ flowchart TD
     T --> R{Risk at or above threshold?}
     R -->|Yes| I[Read-only SQL investigation]
     DB --> I
-    I --> H[Risk review with evidence]
+    I --> S[Retrieve nearest failures]
+    DB --> S
+    S --> H[Risk review with evidence]
     R -->|No| L[Standard checks response]
     H --> OUT[Structured output]
     L --> OUT
 ```
 
-In the workflow, **state** carries the input, prediction, SQL evidence and route; **nodes** do bounded work; **edges** define execution order; the **conditional edge** selects a route. The ML model performs inference—it does not orchestrate the graph.
+In the workflow, **state** carries the input, prediction, SQL evidence, retrieved incidents and route; **nodes** do bounded work; **edges** define execution order; the **conditional edge** selects a route. The ML model performs inference—it does not orchestrate the graph.
 
 For the current graph definition, see [the LangGraph workflow diagram](docs/langgraph_workflow.md). For planned architecture and evaluation decisions, see [architecture](docs/architecture.md), [evaluation methodology](docs/evaluation_methodology.md), and the [model card](docs/model_card.md).
 
@@ -125,11 +128,13 @@ agentops-intelligence-lab/
 │   │   └── Train_model.py              # Initial ML baseline experiment
 │   ├── tools/
 │   │   ├── prediction_tool.py          # Validated inference interface
-│   │   └── sql_investigation_tool.py   # Read-only incident evidence
+│   │   ├── sql_investigation_tool.py   # Read-only incident evidence
+│   │   └── incident_retrieval_tool.py   # Similar failed runs and source IDs
 │   └── agents/
 │       └── graph.py                    # Current deterministic LangGraph workflow
 ├── tests/
-│   └── test_investigation.py           # SQL and workflow regression checks
+│   ├── test_investigation.py           # SQL and workflow regression checks
+│   └── test_incident_retrieval.py       # Ranking, filtering, and shared cutoff
 ├── requirements.txt
 └── README.md
 ```
@@ -173,10 +178,10 @@ python src/tools/sql_investigation_tool.py
 Run the regression tests:
 
 ```bash
-python -m unittest discover -s tests -p 'test_investigation.py' -v
+python -m unittest discover -s tests -v
 ```
 
-The elevated-risk path is **prediction → investigate → risk_review**; the lower-risk path skips SQL. The investigation tool opens SQLite in read-only mode and uses parameterized queries. It returns the source table, synthetic-data marker, UTC cutoff, total runs, failed runs, historical failure rate, and recorded failure labels.
+The elevated-risk path is **prediction → investigate → retrieve_incidents → risk_review**; the lower-risk path skips SQL. The investigation tool opens SQLite in read-only mode and uses parameterized queries. It returns the source table, synthetic-data marker, UTC cutoff, total runs, failed runs, historical failure rate, and recorded failure labels.
 
 An optional graph input, `as_of_utc`, sets the evidence cutoff; otherwise the tool uses the current UTC time. Only records whose `started_at` is strictly before that cutoff are included. Naive timestamps are interpreted as UTC. The synthetic schema does not include completion timestamps, so this filter is based on run start time.
 
@@ -184,7 +189,9 @@ A pipeline with no matching history returns zero counts, a null historical failu
 
 The historical failure rate is an observed fraction across the selected pipeline's recorded runs, not a replacement for the model's case-specific risk estimate. Recorded synthetic labels supply context and do not establish the cause of a new case.
 
-The four regression tests use a temporary SQLite database and controlled prediction outputs. They check workflow and SQL behavior rather than predictive accuracy, and do not require a trained model artifact. The separate local smoke checks exercised the trained model's elevated-risk and lower-risk examples.
+The regression suite uses a temporary SQLite database and controlled prediction outputs. They check workflow and SQL behavior rather than predictive accuracy, and do not require a trained model artifact. The separate local smoke checks exercised the trained model's elevated-risk and lower-risk examples.
+
+See [similar incident retrieval](docs/incident_retrieval.md) for ranking, source references, and limitations.
 
 ## 8. Learning goals and engineering decisions
 
@@ -199,7 +206,7 @@ The four regression tests use a temporary SQLite database and controlled predict
 | Conditional routing | `route_by_risk()` | Clear risk-dependent workflow |
 | Version control | Git commits and public repository | Traceable milestones |
 
-**What this project demonstrates today:** the ability to connect data generation, validation, ML evaluation, model inference, conditional graph routing, and SQL evidence retrieval. **What comes next:** semantic incident retrieval/RAG and evaluated LLM-assisted investigation.
+**What this project demonstrates today:** the ability to connect data generation, validation, ML evaluation, model inference, conditional graph routing, SQL evidence, and similar incident retrieval. **What comes next:** semantic incident retrieval/RAG and evaluated LLM-assisted investigation.
 
 ## 9. Roadmap
 
@@ -211,6 +218,7 @@ The four regression tests use a temporary SQLite database and controlled predict
 - [x] Regression tests for SQL evidence retrieval and both graph branches
 - [ ] Automated tests for inference input validation and model-artifact handling
 - [x] Read-only SQL investigation tool and incident evidence retrieval
+- [x] Structured incident retrieval with source IDs
 - [ ] Historical search / RAG and context selection with source attribution
 - [ ] LLM-based investigation and tool-choice policies with safeguards
 - [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests
