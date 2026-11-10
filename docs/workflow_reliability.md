@@ -67,8 +67,9 @@ From the repository root, with project dependencies installed:
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 15 tests: eight existing SQL/retrieval checks plus seven new
-workflow reliability tests. The new tests cover healthy sources, empty history,
+The reliability checks comprise eight original SQL/retrieval tests plus seven
+workflow reliability tests. Additional tracing tests are documented separately in
+[local run tracing](run_tracing.md). The reliability tests cover healthy sources, empty history,
 an actually missing temporary database, an actually missing SQL table, injected
 retrieval storage errors, low-risk bypass, and errors that must still propagate.
 They use temporary SQLite data, the real graph and read-only tools where applicable,

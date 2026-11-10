@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Fifteen regression tests cover evidence retrieval, both graph branches, and tool-failure behavior. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Optional local JSON traces record node execution, timing, evidence status, and failures. Twenty-five regression tests cover evidence retrieval, risk routing, tool failures, and tracing. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -31,6 +31,7 @@ Production data platforms run ingestion, ETL, synchronization, and reporting job
 | SQL investigation | Read-only, parameterized SQLite queries; time cutoff; failure counts and recorded labels | Implemented |
 | Similar incident retrieval | Fixed-scale feature distance; prior failures; traceable run IDs | Implemented |
 | Workflow reliability | Explicit investigation status; structured storage errors; preserve available evidence | Implemented |
+| Local run tracing | Per-run JSON records with node durations, routes, evidence status and error types | Implemented (local only) |
 | Regression tests | SQL filtering, time cutoff, empty results, risk routing, and incomplete evidence | Implemented |
 | Agent reasoning, RAG, external telemetry, deployment | Not yet implemented | Roadmap |
 
@@ -132,12 +133,16 @@ agentops-intelligence-lab/
 │   │   ├── prediction_tool.py          # Validated inference interface
 │   │   ├── sql_investigation_tool.py   # Read-only incident evidence
 │   │   └── incident_retrieval_tool.py   # Similar failed runs and source IDs
+│   ├── observability/
+│   │   ├── tracing.py                 # Local per-run node instrumentation
+│   │   └── run_workflow.py            # Traced runner and high/low-risk examples
 │   └── agents/
 │       └── graph.py                    # Current deterministic LangGraph workflow
 ├── tests/
 │   ├── test_investigation.py           # SQL and workflow regression checks
 │   ├── test_incident_retrieval.py       # Ranking, filtering, and shared cutoff
-│   └── test_workflow_reliability.py     # Missing sources, partial evidence, error boundaries
+│   ├── test_workflow_reliability.py     # Missing sources, partial evidence, error boundaries
+│   └── test_run_tracing.py             # Paths, timings, failed nodes, isolation and CLI
 ├── requirements.txt
 └── README.md
 ```
@@ -200,6 +205,26 @@ The regression suite uses a temporary SQLite database and controlled prediction 
 
 See [similar incident retrieval](docs/incident_retrieval.md) for ranking, source references, and limitations.
 
+### Local run traces
+
+With the local model artifact and database already generated, run both examples:
+
+```bash
+python -m src.observability.run_workflow --example both
+```
+
+Each invocation saves `runs/<run_id>.json` and prints its path, node order, elapsed time,
+route, and investigation status. `runs/` is ignored by Git. The trace distinguishes
+completed execution with incomplete evidence from an unhandled workflow failure.
+It records node names, durations, statuses and error types without recording input
+features, database rows, final messages or raw exception messages. The synchronous
+runner saves a trace before re-raising ordinary workflow exceptions when trace storage
+is available. The existing untraced graph remains available through `build_graph()`.
+
+This is local instrumentation, not an OpenTelemetry deployment or a production
+latency benchmark. See [local run tracing](docs/run_tracing.md) for the schema,
+Python interface, timing definitions, tests, and limits.
+
 ## 8. Learning goals and engineering decisions
 
 | Concept | Where it appears | Why it matters |
@@ -227,6 +252,7 @@ See [similar incident retrieval](docs/incident_retrieval.md) for ranking, source
 - [x] Read-only SQL investigation tool and incident evidence retrieval
 - [x] Structured incident retrieval with source IDs
 - [x] Explicit incomplete-investigation responses and tool-failure regression tests
+- [x] Local node-level run traces and traced high/low-risk runner
 - [ ] Historical search / RAG and context selection with source attribution
 - [ ] LLM-based investigation and tool-choice policies with safeguards
 - [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests

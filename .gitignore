@@ -58,3 +58,6 @@ evals/results/
 
 # Mac system files
 .DS_Store
+
+# Local workflow traces
+/runs/

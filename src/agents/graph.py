@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph, START, END
 from src.tools.prediction_tool import predict_failure
 from src.tools.sql_investigation_tool import get_pipeline_evidence
 from src.tools.incident_retrieval_tool import retrieve_similar_incidents
+from src.observability.tracing import RunTrace
 
 
 # Shared information passed between graph nodes
@@ -170,15 +171,19 @@ def normal_processing(state: AgentState) -> dict:
 
 
 # Build and compile the graph
-def build_graph():
+def build_graph(*, trace: RunTrace | None = None):
     workflow = StateGraph(AgentState)
 
-    workflow.add_node("validate_input", validate_input)
-    workflow.add_node("prediction", prediction_node)
-    workflow.add_node("investigate", investigate)
-    workflow.add_node("retrieve_incidents", retrieve_incidents)
-    workflow.add_node("risk_review", risk_review)
-    workflow.add_node("normal_processing", normal_processing)
+    nodes = {
+        "validate_input": validate_input,
+        "prediction": prediction_node,
+        "investigate": investigate,
+        "retrieve_incidents": retrieve_incidents,
+        "risk_review": risk_review,
+        "normal_processing": normal_processing,
+    }
+    for name, function in nodes.items():
+        workflow.add_node(name, trace.wrap(name, function) if trace is not None else function)
 
     workflow.add_edge(START, "validate_input")
     workflow.add_edge("validate_input", "prediction")
