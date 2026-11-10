@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. Regression tests cover SQL evidence retrieval and both graph branches. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Fifteen regression tests cover evidence retrieval, both graph branches, and tool-failure behavior. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -30,7 +30,8 @@ Production data platforms run ingestion, ETL, synchronization, and reporting job
 | Workflow | LangGraph shared state, validation and prediction nodes, conditional high/low-risk routes | Implemented (deterministic) |
 | SQL investigation | Read-only, parameterized SQLite queries; time cutoff; failure counts and recorded labels | Implemented |
 | Similar incident retrieval | Fixed-scale feature distance; prior failures; traceable run IDs | Implemented |
-| Regression tests | SQL filtering, time cutoff, empty results, high-risk evidence retrieval, and low-risk SQL bypass | Implemented |
+| Workflow reliability | Explicit investigation status; structured storage errors; preserve available evidence | Implemented |
+| Regression tests | SQL filtering, time cutoff, empty results, risk routing, and incomplete evidence | Implemented |
 | Agent reasoning, RAG, external telemetry, deployment | Not yet implemented | Roadmap |
 
 **Terminology:** The current LangGraph system is a deterministic tool-using workflow, **not** an autonomous LLM agent. The elevated-risk branch now retrieves SQL evidence before risk review. Semantic retrieval/RAG, LLM-driven decisions, and guarded remediation are future milestones.
@@ -49,9 +50,10 @@ flowchart TD
     T --> R{Risk at or above threshold?}
     R -->|Yes| I[Read-only SQL investigation]
     DB --> I
-    I --> S[Retrieve nearest failures]
+    I -->|SQL available| S[Retrieve nearest failures]
+    I -->|SQL unavailable| H
     DB --> S
-    S --> H[Risk review with evidence]
+    S --> H[Risk review with evidence status]
     R -->|No| L[Standard checks response]
     H --> OUT[Structured output]
     L --> OUT
@@ -134,7 +136,8 @@ agentops-intelligence-lab/
 │       └── graph.py                    # Current deterministic LangGraph workflow
 ├── tests/
 │   ├── test_investigation.py           # SQL and workflow regression checks
-│   └── test_incident_retrieval.py       # Ranking, filtering, and shared cutoff
+│   ├── test_incident_retrieval.py       # Ranking, filtering, and shared cutoff
+│   └── test_workflow_reliability.py     # Missing sources, partial evidence, error boundaries
 ├── requirements.txt
 └── README.md
 ```
@@ -185,7 +188,11 @@ The elevated-risk path is **prediction → investigate → retrieve_incidents �
 
 An optional graph input, `as_of_utc`, sets the evidence cutoff; otherwise the tool uses the current UTC time. Only records whose `started_at` is strictly before that cutoff are included. Naive timestamps are interpreted as UTC. The synthetic schema does not include completion timestamps, so this filter is based on run start time.
 
-A pipeline with no matching history returns zero counts, a null historical failure rate, and an empty label list. Missing databases and SQL errors currently propagate as errors; recovery behavior is a future improvement.
+A pipeline with no matching history returns zero counts, a null historical failure rate, and an empty label list. This is a successful query with no matching records, not a source failure.
+
+The graph handles `FileNotFoundError` and SQLite errors from the two evidence tools. If SQL fails, it skips similar-incident retrieval and returns `investigation_status="unavailable"` with null evidence and retrieval. If only similar-incident retrieval fails, it preserves the SQL summary and returns `investigation_status="partial"`. Successful high-risk investigations return `complete`; lower-risk cases return `not_requested` and skip both tools. Structured `tool_errors` identify the tool and exception type. Model errors, input-validation errors, and unexpected programming errors still propagate; there is no automatic repair or retry.
+
+See [workflow reliability](docs/workflow_reliability.md) for response examples, failure tests, research interpretation, and limitations.
 
 The historical failure rate is an observed fraction across the selected pipeline's recorded runs, not a replacement for the model's case-specific risk estimate. Recorded synthetic labels supply context and do not establish the cause of a new case.
 
@@ -219,6 +226,7 @@ See [similar incident retrieval](docs/incident_retrieval.md) for ranking, source
 - [ ] Automated tests for inference input validation and model-artifact handling
 - [x] Read-only SQL investigation tool and incident evidence retrieval
 - [x] Structured incident retrieval with source IDs
+- [x] Explicit incomplete-investigation responses and tool-failure regression tests
 - [ ] Historical search / RAG and context selection with source attribution
 - [ ] LLM-based investigation and tool-choice policies with safeguards
 - [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests
@@ -236,3 +244,4 @@ See [similar incident retrieval](docs/incident_retrieval.md) for ranking, source
 ---
 
 **Portfolio focus:** practical AI engineering fundamentals—data quality, explicit tool contracts, reproducible evaluations, explainable stateful workflows, and incremental deployment readiness.
+

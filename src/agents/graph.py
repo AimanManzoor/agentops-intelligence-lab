@@ -1,5 +1,6 @@
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import TypedDict
@@ -18,8 +19,10 @@ class AgentState(TypedDict, total=False):
     pipeline_name: str
     input_features: dict
     prediction: dict
-    evidence: dict
-    retrieval: dict
+    evidence: dict | None
+    retrieval: dict | None
+    investigation_status: str
+    tool_errors: list[dict]
     as_of_utc: str
     route_taken: str
     final_message: str
@@ -54,31 +57,84 @@ def route_by_risk(state: AgentState) -> str:
 
 # Gather evidence only for elevated-risk cases.
 def investigate(state: AgentState) -> dict:
-    evidence = get_pipeline_evidence(
-        state["pipeline_name"],
-        as_of=state.get("as_of_utc"),
-    )
-    return {"evidence": evidence, "as_of_utc": evidence["as_of_utc"]}
+    try:
+        evidence = get_pipeline_evidence(
+            state["pipeline_name"],
+            as_of=state.get("as_of_utc"),
+        )
+    except (FileNotFoundError, sqlite3.Error) as error:
+        return {
+            "evidence": None,
+            "retrieval": None,
+            "investigation_status": "unavailable",
+            "tool_errors": [{
+                "tool": "sql_investigation", "error_type": type(error).__name__,
+            }],
+        }
+    return {
+        "evidence": evidence,
+        "retrieval": None,
+        "as_of_utc": evidence["as_of_utc"],
+        "investigation_status": "pending_retrieval",
+        "tool_errors": [],
+    }
+
+
+def route_after_investigation(state: AgentState) -> str:
+    if state["investigation_status"] == "unavailable":
+        return "risk_review"
+    return "retrieve_incidents"
 
 
 def retrieve_incidents(state: AgentState) -> dict:
-    retrieval = retrieve_similar_incidents(
-        state["pipeline_name"], state["input_features"],
-        as_of=state["as_of_utc"], k=3,
-    )
-    return {"retrieval": retrieval}
+    try:
+        retrieval = retrieve_similar_incidents(
+            state["pipeline_name"], state["input_features"],
+            as_of=state["as_of_utc"], k=3,
+        )
+    except (FileNotFoundError, sqlite3.Error) as error:
+        return {
+            "retrieval": None,
+            "investigation_status": "partial",
+            "tool_errors": [{
+                "tool": "incident_retrieval", "error_type": type(error).__name__,
+            }],
+        }
+    return {
+        "retrieval": retrieval, "investigation_status": "complete", "tool_errors": [],
+    }
 
 
 # Node 3A: Handle elevated risk
 def risk_review(state: AgentState) -> dict:
     probability = state["prediction"]["failure_probability"]
     evidence = state["evidence"]
-    matches = state["retrieval"]["matches"]
-    references = ", ".join(item["source_id"] for item in matches)
-    retrieval_note = (
-        f"Nearest prior failure references: {references}. "
-        if matches else "No prior failures matched the retrieval filters. "
-    )
+    if evidence is None:
+        return {
+            "route_taken": "risk_review",
+            "final_message": (
+                f"{state['pipeline_name']} has elevated predicted "
+                f"failure risk ({probability:.2%}). "
+                "Prior-run SQL evidence is unavailable; similar-incident retrieval "
+                "was skipped. Historical failure rate and incident references "
+                "cannot be reported for this review. "
+                "Check evidence-source availability and investigate manually."
+            ),
+        }
+
+    retrieval = state["retrieval"]
+    if retrieval is None:
+        retrieval_note = (
+            "Similar-incident retrieval is unavailable; incident references "
+            "cannot be reported for this review. "
+        )
+    else:
+        matches = retrieval["matches"]
+        references = ", ".join(item["source_id"] for item in matches)
+        retrieval_note = (
+            f"Nearest prior failure references: {references}. "
+            if matches else "No prior failures matched the retrieval filters. "
+        )
     history = "No prior matching runs were found before the evidence cutoff."
     if evidence["total_runs"]:
         history = (
@@ -103,6 +159,8 @@ def normal_processing(state: AgentState) -> dict:
 
     return {
         "route_taken": "normal_processing",
+        "investigation_status": "not_requested",
+        "tool_errors": [],
         "final_message": (
             f"{state['pipeline_name']} has lower predicted "
             f"failure risk ({probability:.2%}). "
@@ -134,7 +192,11 @@ def build_graph():
         },
     )
 
-    workflow.add_edge("investigate", "retrieve_incidents")
+    workflow.add_conditional_edges(
+        "investigate",
+        route_after_investigation,
+        {"retrieve_incidents": "retrieve_incidents", "risk_review": "risk_review"},
+    )
     workflow.add_edge("retrieve_incidents", "risk_review")
     workflow.add_edge("risk_review", END)
     workflow.add_edge("normal_processing", END)
@@ -170,3 +232,4 @@ if __name__ == "__main__":
     )
 
     print(f"\nGraph documentation saved to: {diagram_path}")
+

@@ -1,30 +1,22 @@
 # AgentOps LangGraph Workflow
 
 ```mermaid
----
-config:
-  flowchart:
-    curve: linear
----
-graph TD;
-	__start__([<p>__start__</p>]):::first
-	validate_input(validate_input)
-	prediction(prediction)
-	investigate(investigate)
-	retrieve_incidents(retrieve_incidents)
-	risk_review(risk_review)
-	normal_processing(normal_processing)
-	__end__([<p>__end__</p>]):::last
-	__start__ --> validate_input;
-	investigate --> retrieve_incidents;
-	prediction -. &nbsp;risk_review&nbsp; .-> investigate;
-	prediction -.-> normal_processing;
-	retrieve_incidents --> risk_review;
-	validate_input --> prediction;
-	normal_processing --> __end__;
-	risk_review --> __end__;
-	classDef default fill:#f2f0ff,line-height:1.2
-	classDef first fill-opacity:0
-	classDef last fill:#bfb6fc
-
+flowchart TD
+    V[Validate input] --> P[Predict failure risk]
+    P -->|Elevated risk| I[Read SQL evidence]
+    P -->|Lower risk| N[Standard checks]
+    I -->|SQL available| R[Retrieve prior failures]
+    I -->|SQL unavailable| H[Risk review]
+    R -->|Results or explicit retrieval error| H
+    H --> E[Return structured result]
+    N --> E
 ```
+
+Successful investigations return `complete`, including those with no matching
+history. SQL storage failures return `unavailable` and skip retrieval. Retrieval
+storage failures return `partial` while preserving SQL evidence. Lower-risk runs
+return `not_requested` and skip both tools. Input/model errors and unexpected
+programming errors still propagate.
+
+See [workflow reliability](workflow_reliability.md) for the response contract and tests.
+
