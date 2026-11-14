@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Optional local JSON traces record node execution, timing, evidence status, and failures. Twenty-five regression tests cover evidence retrieval, risk routing, tool failures, and tracing. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and CI/CD.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Optional local JSON traces record node execution, timing, evidence status, and failures. Twenty-five regression tests cover evidence retrieval, risk routing, tool failures, and tracing. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and deployment automation.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -257,7 +257,8 @@ Python interface, timing definitions, tests, and limits.
 - [ ] LLM-based investigation and tool-choice policies with safeguards
 - [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests
 - [ ] OpenTelemetry traces, real telemetry ingestion and drift checks
-- [ ] FastAPI, Docker, GitHub Actions CI/CD, deployment and monitoring
+- [x] GitHub Actions regression workflow
+- [ ] FastAPI, Docker, deployment automation and monitoring
 
 ## 10. Current limitations
 
@@ -271,3 +272,35 @@ Python interface, timing definitions, tests, and limits.
 
 **Portfolio focus:** practical AI engineering fundamentals—data quality, explicit tool contracts, reproducible evaluations, explainable stateful workflows, and incremental deployment readiness.
 
+
+
+## Automated regression checks
+
+Workflow: `.github/workflows/tests.yml`.
+
+On pushes to main, pull requests, or manual runs, GitHub starts an Ubuntu
+job using Python 3.12. It installs requirements.txt, checks dependency
+compatibility, and runs the regression suite.
+
+The job fails if no tests are discovered or any test fails.
+No API keys, local database, or trained model artifact are required.
+Tests use controlled prediction outputs and temporary fixtures.
+
+Run locally in the project environment:
+
+    python -m pip check
+    python -m unittest discover -s tests -v
+
+The current suite contains 25 tests. A clean-environment local run passed
+before preparing this workflow. Check the first hosted run after pushing:
+
+https://github.com/AimanManzoor/agentops-intelligence-lab/actions
+
+Select AgentOps regression tests and inspect any failed step.
+
+A passing workflow checks covered software behavior. It does not establish
+predictive accuracy, groundedness, or production reliability.
+This job does not train models or deploy a service.
+
+Making this check mandatory before merging requires a separate repository
+ruleset or branch-protection configuration.
