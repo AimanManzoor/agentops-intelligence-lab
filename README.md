@@ -2,7 +2,7 @@
 
 **A reproducible, evaluation-first prototype for predicting data-pipeline failures and building toward evidence-grounded AI incident investigation.**
 
-**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Optional local JSON traces record node execution, timing, evidence status, and failures. Twenty-five regression tests cover evidence retrieval, risk routing, tool failures, and tracing. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and deployment automation.
+**Current status:** Synthetic data pipeline, baseline predictive ML, validated evaluation workflow, inference tool, read-only SQL evidence retrieval, similar incident retrieval, and deterministic LangGraph risk routing implemented. The workflow reports incomplete investigations when evidence tools fail. Optional local JSON traces record node execution, timing, evidence status, and failures. Thirty-seven regression tests cover inference contracts, evidence retrieval, risk routing, tool failures, and tracing. **Planned:** semantic incident retrieval/RAG, LLM-assisted investigation, broader agent evaluations, OpenTelemetry, API deployment, containerization, and deployment automation.
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
@@ -62,7 +62,7 @@ flowchart TD
 
 In the workflow, **state** carries the input, prediction, SQL evidence, retrieved incidents and route; **nodes** do bounded work; **edges** define execution order; the **conditional edge** selects a route. The ML model performs inference—it does not orchestrate the graph.
 
-For the current graph definition, see [the LangGraph workflow diagram](docs/langgraph_workflow.md). For planned architecture and evaluation decisions, see [architecture](docs/architecture.md), [evaluation methodology](docs/evaluation_methodology.md), and the [model card](docs/model_card.md).
+For the current graph definition, see [the LangGraph workflow diagram](docs/langgraph_workflow.md). For architecture and evaluation decisions, see [architecture](docs/architecture.md), [evaluation methodology](docs/evaluation_methodology.md), and the [model card](docs/model_card.md).
 
 ## 4. Data design
 
@@ -139,6 +139,7 @@ agentops-intelligence-lab/
 │   └── agents/
 │       └── graph.py                    # Current deterministic LangGraph workflow
 ├── tests/
+│   ├── test_prediction_tool.py         # Input, artifact, probability and routing contract
 │   ├── test_investigation.py           # SQL and workflow regression checks
 │   ├── test_incident_retrieval.py       # Ranking, filtering, and shared cutoff
 │   ├── test_workflow_reliability.py     # Missing sources, partial evidence, error boundaries
@@ -240,6 +241,44 @@ Python interface, timing definitions, tests, and limits.
 
 **What this project demonstrates today:** the ability to connect data generation, validation, ML evaluation, model inference, conditional graph routing, SQL evidence, and similar incident retrieval. **What comes next:** semantic incident retrieval/RAG and evaluated LLM-assisted investigation.
 
+## Prediction reliability milestone
+
+The inference tool now validates inputs before accessing a model artifact,
+checks artifact metadata and threshold bounds, locates the failure class by label,
+and rejects invalid probability shapes, NaN/infinite values, out-of-range values,
+or probability rows that do not sum to one within tolerance.
+
+Prediction failures stop the graph before either evidence tool runs. There is no
+fallback lower-risk prediction, retry, artifact repair, or model retraining.
+Routing uses the unrounded probability; the display rounds to four decimals.
+
+Twelve new tests bring the suite to **37**. They include a small locally trained
+artifact roundtrip and a graph-level invalid-probability failure. The new regression
+cases expose failures against the previous implementation; all 37 tests pass
+locally with the fix. Dependency compatibility also passed. Hosted Actions results
+must be checked separately after the push.
+
+See [prediction contract](docs/prediction_contract.md),
+[model card](docs/model_card.md), and
+[evaluation methodology](docs/evaluation_methodology.md).
+The model card records the previously reported synthetic results; this milestone
+does not rerun the full-dataset evaluation or claim improved predictive quality.
+
+### Baseline v1 finish line
+
+The following would make a bounded, reviewable baseline release:
+
+1. Add a versioned workflow scenario evaluation with expected routes, tool calls,
+   evidence cutoffs, incomplete-source outcomes, and trace outcomes.
+2. Verify the documented fresh-clone data generation, training, inference, and
+   traced high/low-risk examples in one clean environment; record actual results.
+3. Review the results and limitations together and publish a baseline release.
+
+RAG, LLM-assisted investigation, OpenTelemetry, a UI/API and containerized hosting
+are optional later milestones rather than prerequisites for this deterministic
+baseline. If adding an LLM, first define reference tasks, permitted actions and
+independent evidence checks; compare it against the deterministic workflow.
+
 ## 9. Roadmap
 
 - [x] Seeded synthetic pipeline data and SQLite storage
@@ -248,7 +287,7 @@ Python interface, timing definitions, tests, and limits.
 - [x] Validated inference tool
 - [x] Deterministic LangGraph graph and conditional routing
 - [x] Regression tests for SQL evidence retrieval and both graph branches
-- [ ] Automated tests for inference input validation and model-artifact handling
+- [x] Automated tests for inference input validation, trusted-artifact contracts, class ordering, and probability outputs
 - [x] Read-only SQL investigation tool and incident evidence retrieval
 - [x] Structured incident retrieval with source IDs
 - [x] Explicit incomplete-investigation responses and tool-failure regression tests
@@ -291,7 +330,7 @@ Run locally in the project environment:
     python -m pip check
     python -m unittest discover -s tests -v
 
-The current suite contains 25 tests. A clean-environment local run passed
+The current suite contains 37 tests. A clean-environment local run passed
 before preparing this workflow. Check the first hosted run after pushing:
 
 https://github.com/AimanManzoor/agentops-intelligence-lab/actions
