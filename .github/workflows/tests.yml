@@ -45,3 +45,6 @@ jobs:
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           raise SystemExit(0 if result.wasSuccessful() else 1)
           PY
+
+      - name: Evaluate versioned workflow scenarios
+        run: python -m evals.evaluate_workflow

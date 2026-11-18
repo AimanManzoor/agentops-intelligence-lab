@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "suite_id": "workflow_scenarios_v1",
+  "cases": [
+    {
+      "id": "high_risk_prior_evidence",
+      "mode": "healthy",
+      "expected": {
+        "route": "risk_review",
+        "investigation": "complete",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          1,
+          1
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "investigate",
+          "retrieve_incidents",
+          "risk_review"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "completed",
+          "completed",
+          "completed"
+        ],
+        "tool_errors": [],
+        "total_runs": 2,
+        "failed_runs": 1,
+        "source_ids": [
+          "realistic_incidents:1"
+        ],
+        "cutoffs_match": true,
+        "message_contains": [
+          "90.00%",
+          "1 failures out of 2",
+          "50.00%",
+          "realistic_incidents:1"
+        ],
+        "message_excludes": [
+          "realistic_incidents:3",
+          "realistic_incidents:4",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "low_risk_skips_tools",
+      "mode": "low",
+      "expected": {
+        "route": "normal_processing",
+        "investigation": "not_requested",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          0,
+          0
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "normal_processing"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "completed"
+        ],
+        "tool_errors": [],
+        "total_runs": null,
+        "failed_runs": null,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [
+          "1.00%",
+          "Continue standard operational checks."
+        ],
+        "message_excludes": [
+          "realistic_incidents:",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "empty_history_is_available",
+      "mode": "empty",
+      "expected": {
+        "route": "risk_review",
+        "investigation": "complete",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          1,
+          1
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "investigate",
+          "retrieve_incidents",
+          "risk_review"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "completed",
+          "completed",
+          "completed"
+        ],
+        "tool_errors": [],
+        "total_runs": 0,
+        "failed_runs": 0,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [
+          "No prior matching runs",
+          "No prior failures matched"
+        ],
+        "message_excludes": [
+          "unavailable",
+          "realistic_incidents:",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "missing_database_skips_retrieval",
+      "mode": "missing_database",
+      "expected": {
+        "route": "risk_review",
+        "investigation": "unavailable",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          1,
+          0
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "investigate",
+          "risk_review"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "degraded",
+          "completed"
+        ],
+        "tool_errors": [
+          {
+            "tool": "sql_investigation",
+            "error_type": "FileNotFoundError"
+          }
+        ],
+        "total_runs": null,
+        "failed_runs": null,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [
+          "SQL evidence is unavailable",
+          "retrieval was skipped"
+        ],
+        "message_excludes": [
+          "realistic_incidents:",
+          "50.00%",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "missing_table_is_unavailable",
+      "mode": "missing_table",
+      "expected": {
+        "route": "risk_review",
+        "investigation": "unavailable",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          1,
+          0
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "investigate",
+          "risk_review"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "degraded",
+          "completed"
+        ],
+        "tool_errors": [
+          {
+            "tool": "sql_investigation",
+            "error_type": "OperationalError"
+          }
+        ],
+        "total_runs": null,
+        "failed_runs": null,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [
+          "SQL evidence is unavailable"
+        ],
+        "message_excludes": [
+          "realistic_incidents:",
+          "50.00%",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "retrieval_failure_preserves_sql",
+      "mode": "retrieval_error",
+      "expected": {
+        "route": "risk_review",
+        "investigation": "partial",
+        "error": null,
+        "failed_node": null,
+        "calls": [
+          1,
+          1,
+          1
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction",
+          "investigate",
+          "retrieve_incidents",
+          "risk_review"
+        ],
+        "event_statuses": [
+          "completed",
+          "completed",
+          "completed",
+          "degraded",
+          "completed"
+        ],
+        "tool_errors": [
+          {
+            "tool": "incident_retrieval",
+            "error_type": "OperationalError"
+          }
+        ],
+        "total_runs": 2,
+        "failed_runs": 1,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [
+          "1 failures out of 2",
+          "50.00%",
+          "retrieval is unavailable"
+        ],
+        "message_excludes": [
+          "realistic_incidents:",
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "prediction_error_stops_workflow",
+      "mode": "prediction_error",
+      "expected": {
+        "route": null,
+        "investigation": null,
+        "error": "ValueError",
+        "failed_node": "prediction",
+        "calls": [
+          1,
+          0,
+          0
+        ],
+        "nodes": [
+          "validate_input",
+          "prediction"
+        ],
+        "event_statuses": [
+          "completed",
+          "failed"
+        ],
+        "tool_errors": [],
+        "total_runs": null,
+        "failed_runs": null,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [],
+        "message_excludes": [
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    },
+    {
+      "id": "invalid_request_stops_before_prediction",
+      "mode": "invalid_request",
+      "expected": {
+        "route": null,
+        "investigation": null,
+        "error": "ValueError",
+        "failed_node": "validate_input",
+        "calls": [
+          0,
+          0,
+          0
+        ],
+        "nodes": [
+          "validate_input"
+        ],
+        "event_statuses": [
+          "failed"
+        ],
+        "tool_errors": [],
+        "total_runs": null,
+        "failed_runs": null,
+        "source_ids": [],
+        "cutoffs_match": true,
+        "message_contains": [],
+        "message_excludes": [
+          "PRIVATE_FAULT_DETAIL"
+        ]
+      }
+    }
+  ]
+}

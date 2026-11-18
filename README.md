@@ -268,8 +268,8 @@ does not rerun the full-dataset evaluation or claim improved predictive quality.
 
 The following would make a bounded, reviewable baseline release:
 
-1. Add a versioned workflow scenario evaluation with expected routes, tool calls,
-   evidence cutoffs, incomplete-source outcomes, and trace outcomes.
+1. Completed: versioned workflow scenario evaluation with expected routes, tool
+   calls, evidence cutoffs, incomplete-source outcomes, and trace outcomes.
 2. Verify the documented fresh-clone data generation, training, inference, and
    traced high/low-risk examples in one clean environment; record actual results.
 3. Review the results and limitations together and publish a baseline release.
@@ -294,7 +294,8 @@ independent evidence checks; compare it against the deterministic workflow.
 - [x] Local node-level run traces and traced high/low-risk runner
 - [ ] Historical search / RAG and context selection with source attribution
 - [ ] LLM-based investigation and tool-choice policies with safeguards
-- [ ] Agent evaluation harness: tool accuracy, groundedness, latency, regression tests
+- [x] Versioned deterministic workflow evaluation: routing, tool calls, cutoffs, evidence outcomes, and traces
+- [ ] Broader agent evaluation: semantic groundedness, model quality, and performance under realistic load
 - [ ] OpenTelemetry traces, real telemetry ingestion and drift checks
 - [x] GitHub Actions regression workflow
 - [ ] FastAPI, Docker, deployment automation and monitoring
@@ -319,9 +320,9 @@ Workflow: `.github/workflows/tests.yml`.
 
 On pushes to main, pull requests, or manual runs, GitHub starts an Ubuntu
 job using Python 3.12. It installs requirements.txt, checks dependency
-compatibility, and runs the regression suite.
+compatibility, runs the regression suite, and evaluates the versioned workflow scenarios.
 
-The job fails if no tests are discovered or any test fails.
+The job fails if no tests are discovered, any test fails, or any workflow scenario fails.
 No API keys, local database, or trained model artifact are required.
 Tests use controlled prediction outputs and temporary fixtures.
 
@@ -329,8 +330,9 @@ Run locally in the project environment:
 
     python -m pip check
     python -m unittest discover -s tests -v
+    python -m evals.evaluate_workflow
 
-The current suite contains 37 tests. A clean-environment local run passed
+The current suite contains 44 regression tests and 8 workflow scenarios. A clean-environment local run passed
 before preparing this workflow. Check the first hosted run after pushing:
 
 https://github.com/AimanManzoor/agentops-intelligence-lab/actions
@@ -343,3 +345,32 @@ This job does not train models or deploy a service.
 
 Making this check mandatory before merging requires a separate repository
 ruleset or branch-protection configuration.
+
+## Versioned workflow evaluation milestone
+
+Run `python -m evals.evaluate_workflow` from the repository root. The runner
+loads eight manually specified contracts from `evals/workflow_scenarios_v1.json`,
+executes the traced graph against a fresh temporary SQLite fixture per case,
+and prints a JSON report with per-check failures and a reference SHA-256.
+Exit codes: 0 = all cases pass, 1 = contract mismatch, 2 = invalid reference.
+
+Covered cases: high risk with prior evidence, low risk with no evidence calls,
+empty history, missing database, missing table, retrieval failure, prediction
+failure, and invalid request. Checks cover node order, tool-call counts, shared
+cutoffs, SQL counts, source IDs, selected message facts, trace outcomes,
+payload omission, and unchanged fixture databases. Exact-cutoff and future
+records are decoys and must not appear in the healthy case.
+
+Local validation: **44 regression tests and all 8 scenarios passed**. Negative
+controls detected wrong reference counts, broken routing, future evidence,
+and a payload injected into a trace. CLI tests verified nonzero failure exits.
+Hosted Actions status is a separate result: inspect the workflow after pushing.
+
+Predictions are controlled stubs. SQL evidence and incident retrieval use the
+real implementations, except an explicitly injected retrieval storage error.
+No API keys, local project database, trained project model, or provider calls
+are required. This is a deterministic contract regression suite, not a held-out
+model benchmark, a production reliability estimate, or a semantic groundedness
+score. Timing fields are not graded as performance targets.
+
+See [workflow evaluation methodology](docs/workflow_evaluation.md).
