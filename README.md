@@ -374,3 +374,8 @@ model benchmark, a production reliability estimate, or a semantic groundedness
 score. Timing fields are not graded as performance targets.
 
 See [workflow evaluation methodology](docs/workflow_evaluation.md).
+
+
+## Reproduction evidence
+
+[Local reproduction check](docs/reproduction_check.md)
