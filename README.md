@@ -6,6 +6,12 @@
 
 > **Scope and safety:** This is a portfolio/research prototype using synthetic data. Its risk probabilities and recommendations are **not validated for production decisions**. It does not currently take autonomous remediation actions.
 
+## Interactive BI dashboard
+
+[Dashboard source](docs/dashboard/index.html) — a browser-based view of 5,000 reproducible synthetic incidents. Filter by pipeline, outcome, date, or root cause; click chart categories to cross-filter; inspect individual runs and export the current selection as CSV. All calculations happen locally in the browser. No database, API key, production data, or model artifact is required. This is instant analysis of a fixed synthetic sample, not live monitoring or model inference.
+
+To try locally, open `docs/dashboard/index.html` in a browser or run `python -m http.server 8000 --directory docs` and visit `http://localhost:8000/dashboard/`. Regenerate the sample with `python docs/dashboard/export_sample.py` and check calculations with `node --test docs/dashboard/dashboard.test.js`.
+
 ## 1. Mission and problem
 
 Production data platforms run ingestion, ETL, synchronization, and reporting jobs. Failures may stem from resource pressure, workload, or transient processing issues. Teams need not only alerts but also reproducible risk estimates, relevant evidence, and explanations that can be tested.
