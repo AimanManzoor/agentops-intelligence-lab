@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "cost_interpretation": "Illustrative relative penalty units, not dollars or measured business impact.",
+  "policies": {
+    "limited_capacity": {
+      "false_alert_cost": 1,
+      "missed_failure_cost": 2,
+      "max_alert_fraction": 0.2
+    },
+    "high_sensitivity": {
+      "false_alert_cost": 1,
+      "missed_failure_cost": 10,
+      "max_alert_fraction": 1
+    }
+  }
+}

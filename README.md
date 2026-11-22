@@ -393,3 +393,14 @@ CSV formula-risk handling, six security regression tests and CI coverage.
 See [security scope and limitations](docs/security.md).
 
 Run locally: `node --test docs/dashboard/*.test.js`.
+
+
+## Cost-aware alert policy experiment
+
+Compare validation-selected alert thresholds under versioned illustrative costs
+and investigation-capacity limits. Report precision, recall, false alerts, missed
+failures and alert volume against the existing 0.26 threshold and constant policies.
+This is a retrospective synthetic experiment; it does not deploy a threshold.
+
+Run: `python -m evals.evaluate_alert_policy`.
+See [protocol and interpretation](docs/alert_policy.md).
