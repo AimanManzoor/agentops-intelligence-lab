@@ -10,7 +10,7 @@
 
 [Dashboard source](docs/dashboard/index.html) — a browser-based view of 5,000 reproducible synthetic incidents. Filter by pipeline, outcome, date, or root cause; click chart categories to cross-filter; inspect individual runs and export the current selection as CSV. All calculations happen locally in the browser. No database, API key, production data, or model artifact is required. This is instant analysis of a fixed synthetic sample, not live monitoring or model inference.
 
-To try locally, open `docs/dashboard/index.html` in a browser or run `python -m http.server 8000 --directory docs` and visit `http://localhost:8000/dashboard/`. Regenerate the sample with `python docs/dashboard/export_sample.py` and check calculations with `node --test docs/dashboard/dashboard.test.js`.
+To try locally, open `docs/dashboard/index.html` in a browser or run `python -m http.server 8000 --bind 127.0.0.1 --directory docs` and visit `http://localhost:8000/dashboard/`. Regenerate the sample with `python docs/dashboard/export_sample.py` and check calculations with `node --test docs/dashboard/dashboard.test.js`.
 
 ## 1. Mission and problem
 
@@ -385,3 +385,11 @@ See [workflow evaluation methodology](docs/workflow_evaluation.md).
 ## Reproduction evidence
 
 [Local reproduction check](docs/reproduction_check.md)
+
+
+## Dashboard export security
+
+CSV formula-risk handling, six security regression tests and CI coverage.
+See [security scope and limitations](docs/security.md).
+
+Run locally: `node --test docs/dashboard/*.test.js`.

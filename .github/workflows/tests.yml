@@ -48,3 +48,12 @@ jobs:
 
       - name: Evaluate versioned workflow scenarios
         run: python -m evals.evaluate_workflow
+
+      - name: Set up Node for dashboard checks
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Test dashboard and CSV security
+        run: node --test docs/dashboard/*.test.js
