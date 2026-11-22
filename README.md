@@ -404,3 +404,53 @@ This is a retrospective synthetic experiment; it does not deploy a threshold.
 
 Run: `python -m evals.evaluate_alert_policy`.
 See [protocol and interpretation](docs/alert_policy.md).
+
+## Alert-policy experiment results
+
+Retrospective evaluation on 750 synthetic test records, including 278 failures.
+Thresholds were selected on validation data. The test partition had previously
+been inspected; these results are exploratory, not independent confirmation.
+
+| Approach | Alerts | Missed failures | False alerts | Recall |
+|---|---:|---:|---:|---:|
+| Existing threshold: 0.26 | 512 | 38 | 272 | 86.3% |
+| Capacity-limited policy | 163 | 163 | 48 | 41.4% |
+| High-sensitivity policy | 730 | 3 | 455 | 98.9% |
+| Always alert | 750 | 0 | 472 | 100.0% |
+| Never alert | 0 | 278 | 0 | 0.0% |
+
+### Findings
+
+- Capacity-limited alerts reached 21.7% of test runs, exceeding the
+  20% validation constraint. Fewer alerts came with more missed failures.
+- With false-alert cost 1 and missed-failure cost 2, the capacity policy
+  cost 374 units versus 348 for the existing threshold.
+- High sensitivity caught 98.9% of failures but alerted on 97.3% of runs.
+- With false-alert cost 1 and missed-failure cost 10, high sensitivity
+  cost 485 units versus 652 for the existing threshold and 472 for
+  always alerting.
+
+Costs are illustrative penalty units, not dollars or measured savings.
+Compare costs only within the same assumptions.
+
+Neither selected policy established a deployment-ready improvement.
+The capacity limit did not hold on later records, and high sensitivity
+did not beat always alerting on cost.
+
+### Engineering takeaway
+
+Evaluate prediction quality alongside investigation workload, missed
+incidents and simple baselines. The experiment leaves the workflow's
+current threshold unchanged.
+
+Run locally:
+
+    python -m evals.evaluate_alert_policy
+
+The detailed report stays local at
+evals/results/alert_policy_evaluation.json.
+
+See [evaluation protocol](docs/alert_policy.md).
+
+Next research direction: define a fixed-budget ranking experiment before
+evaluating it on an independent synthetic dataset.
