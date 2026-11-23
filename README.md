@@ -468,3 +468,21 @@ See [queue contract and research limits](docs/review_queue.md).
 
 Current offline coverage: 61 Python regression tests, 8 workflow scenarios,
 and 9 dashboard tests. Hosted CI results must be checked after pushing.
+
+## Review queue ranking evaluation
+
+Compare learned risk ranking, highest workload and seeded random selection at
+the same budget: 50 reviews per 250-run synthetic batch, across 10 new generator
+seeds. The protocol fixes model settings, seeds and capacity before evaluation.
+Labels are joined after selection; the generator's true probability is excluded
+from model inputs.
+
+Run: `python -m evals.evaluate_review_queue --write-summary`.
+
+See [evaluation protocol](docs/review_queue_evaluation.md) and
+[reproducible results](docs/review_queue_results.md).
+These are same-generator simulations, not evidence of real-world or temporal
+generalization. Live routing and model artifacts remain unchanged.
+
+Current validation: 72 Python regression tests, 8 workflow scenarios and
+9 dashboard tests. Hosted Actions results must be inspected after pushing.

@@ -21,12 +21,17 @@ PIPELINES = [
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
-def main():
-    rng = random.Random(SEED)
+def generate_records(*, seed, num_runs):
+    """Pure seeded generator; same simulation as the original database writer."""
+    if type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError("Seed must be an integer in [0, 2**32).")
+    if type(num_runs) is not int or not 1 <= num_runs <= 10000:
+        raise ValueError("Record count must be an integer from 1 to 10000.")
+    rng = random.Random(seed)
     start_date = datetime(2026, 1, 1)
     records = []
 
-    for i in range(1, NUM_RUNS + 1):
+    for i in range(1, num_runs + 1):
         pipeline = rng.choice(PIPELINES)
         workload = rng.randint(100, 10000)
         cpu = round(rng.uniform(15, 98), 2)
@@ -67,6 +72,12 @@ def main():
             round(failure_probability, 4),
             failed, root_cause
         ))
+
+    return records
+
+
+def main():
+    records = generate_records(seed=SEED, num_runs=NUM_RUNS)
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""

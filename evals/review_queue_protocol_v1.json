@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "training_seed": 42,
+  "training_rows": 3500,
+  "batch_seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010
+  ],
+  "batch_size": 250,
+  "review_budget": 50,
+  "random_seeds": [
+    11,
+    22,
+    33,
+    44,
+    55
+  ]
+}
