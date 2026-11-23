@@ -454,3 +454,17 @@ See [evaluation protocol](docs/alert_policy.md).
 
 Next research direction: define a fixed-budget ranking experiment before
 evaluating it on an independent synthetic dataset.
+
+## Capacity-limited review queue
+
+Select at most a fixed number of eligible runs from one supplied score batch.
+The queue ranks by descending probability with deterministic run-ID tie-breaking,
+rejects invalid inputs and labels, and reports deferred work. It does not change
+live routing, load a model, or take automatic actions.
+
+Try: `python -m src.tools.review_queue --demo --budget 2`.
+The demo uses handcrafted scores, not trained predictions.
+See [queue contract and research limits](docs/review_queue.md).
+
+Current offline coverage: 61 Python regression tests, 8 workflow scenarios,
+and 9 dashboard tests. Hosted CI results must be checked after pushing.
